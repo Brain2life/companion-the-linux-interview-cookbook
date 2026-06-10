@@ -1,2 +1,3 @@
 # companion-the-linux-interview-cookbook
-The Linux Interview Cookbook
+
+![book_cover](./docs/img/cover.png)
