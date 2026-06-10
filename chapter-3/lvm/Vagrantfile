@@ -1,0 +1,107 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Chapter 3 – LVM: Extending Disk Space for a Database Server
+#
+# Provisions an Ubuntu 22.04 VM that simulates a production database server
+# with an LVM-backed data directory that is running low on space.
+#
+# Disk layout after `vagrant up`:
+#   /dev/sda  – root disk (managed by Vagrant)
+#   /dev/sdb  – 5 GB, pre-configured: PV → VG "vg_data" → LV "lv_pgdata" (4 GB, ext4, mounted at /pgdata)
+#   /dev/sdc  – 5 GB, raw (available for Exercise 1: extend the existing VG)
+#   /dev/sdd  – 5 GB, raw (available for Exercise 2: create a dedicated log volume)
+
+DISK_SIZE_MB = 5 * 1024   # 5 GB
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.hostname = "db-server"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name   = "lvm-db-server"
+    vb.memory = 1024
+    vb.cpus   = 1
+
+    # Create and attach three extra disks.
+    # bento/ubuntu-22.04 uses a SATA controller named "SATA Controller".
+    {
+      "extra_disk_sdb.vdi" => 1,
+      "extra_disk_sdc.vdi" => 2,
+      "extra_disk_sdd.vdi" => 3
+    }.each do |filename, port|
+      disk_path = File.join(File.dirname(__FILE__), filename)
+      unless File.exist?(disk_path)
+        vb.customize [
+          "createhd",
+          "--filename", disk_path,
+          "--size",     DISK_SIZE_MB
+        ]
+      end
+      vb.customize [
+        "storageattach", :id,
+        "--storagectl", "SATA Controller",
+        "--port",       port,
+        "--device",     0,
+        "--type",       "hdd",
+        "--medium",     disk_path
+      ]
+    end
+  end
+
+  config.vm.provision "shell", name: "setup-lvm", inline: <<~SHELL
+    set -e
+
+    echo ">>> Installing lvm2..."
+    apt-get update -qq
+    apt-get install -y lvm2 > /dev/null
+
+    # ----------------------------------------------------------------
+    # Bootstrap: simulate an existing LVM-backed PostgreSQL data dir.
+    # Run only once – skip if the VG already exists.
+    # ----------------------------------------------------------------
+    if ! vgs vg_data &>/dev/null; then
+      echo ">>> Setting up initial LVM on /dev/sdb..."
+
+      pvcreate /dev/sdb
+      vgcreate vg_data /dev/sdb
+      lvcreate -L 4G -n lv_pgdata vg_data
+      mkfs.ext4 -q /dev/vg_data/lv_pgdata
+
+      mkdir -p /pgdata
+      mount /dev/vg_data/lv_pgdata /pgdata
+
+      # Persist the mount across reboots
+      echo "/dev/vg_data/lv_pgdata  /pgdata  ext4  defaults  0 2" >> /etc/fstab
+
+      # Simulate existing database files (~500 MB) so the volume looks used
+      echo ">>> Populating /pgdata with simulated database files..."
+      mkdir -p /pgdata/base /pgdata/pg_wal /pgdata/pg_log
+      dd if=/dev/urandom bs=1M count=512 2>/dev/null | gzip -1 > /pgdata/base/data.gz
+      dd if=/dev/urandom bs=1M count=50  2>/dev/null | gzip -1 > /pgdata/pg_wal/wal.gz
+
+      echo ">>> Initial LVM setup complete."
+    else
+      echo ">>> LVM already initialised, skipping bootstrap."
+    fi
+
+    echo ""
+    echo "======================================================="
+    echo "  db-server is ready. Current disk layout:"
+    echo "======================================================="
+    lsblk
+    echo ""
+    echo "LVM summary:"
+    pvs
+    echo ""
+    vgs
+    echo ""
+    lvs
+    echo ""
+    echo "Filesystem usage:"
+    df -h /pgdata
+    echo ""
+    echo "/dev/sdc and /dev/sdd are raw disks — ready for the exercises."
+    echo "======================================================="
+  SHELL
+end
