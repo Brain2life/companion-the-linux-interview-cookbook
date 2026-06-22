@@ -34,6 +34,8 @@ uname -r
 
 By default Ubuntu 22.04.5 LTS VM uses `5.15.0-179-generic` Linux kernel version. In this workshop you have to compile new Linux kernel `5.15.137` version and install it on VM machine.
 
+For more information about compilation steps, see [Why Would You Need to Compile the Linux Kernel and How to Do It?](https://the-linux-interview-cookbook.netlify.app/chapter_1.html#why-would-you-need-to-compile-the-linux-kernel-and-how-to-do-it)
+
 ## Support 
 
 If you find this exercise valuable, consider supporting it on Ko-fi:
