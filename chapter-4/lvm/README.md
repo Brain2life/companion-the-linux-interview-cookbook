@@ -272,3 +272,11 @@ tmpfs                               96M  8.0K   96M   1% /run/user/1000
 vagrant destroy -f
 rm -f extra_disk_sdb.vdi extra_disk_sdc.vdi extra_disk_sdd.vdi
 ```
+
+---
+
+## Support 
+
+If you find this exercise valuable, consider supporting it on Ko-fi:
+
+<a href='https://ko-fi.com/B0B61Z2ERC' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
